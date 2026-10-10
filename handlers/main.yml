@@ -1,5 +1,10 @@
 ---
 # send test mail to admin
-- name: test mail
-  shell: echo "Test mail from new/updated MSTMP at" `hostname` | mail root -s "Test SMTP `hostname`"
+- name: Test mail
+  ansible.builtin.shell: |
+    set -o pipefail
+    echo "Test mail from new/updated MSTMP at $(hostname)" | mail root -s "Test SMTP $(hostname)"
+  args:
+    executable: /bin/bash
+  changed_when: false
   tags: mail

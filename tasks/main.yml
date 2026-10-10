@@ -1,3 +1,3 @@
 ---
-
-- include: msmtp.yml
+- name: Import msmtp tasks
+  ansible.builtin.import_tasks: msmtp.yml

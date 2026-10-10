@@ -1,6 +1,8 @@
 ---
-- hosts: all
-  sudo: True
-  roles:
-    - ansible-msmtp
+- name: Apply msmtp role
+  hosts: all
+  become: true
+  tasks:
+    - name: Import msmtp task set
+      ansible.builtin.import_tasks: tasks/msmtp.yml
 

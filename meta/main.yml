@@ -1,11 +1,18 @@
 galaxy_info:
-  author: Adham Helal
-  description: "Deploy msmtp mail for Ubuntu 12.04"
-  min_ansible_version: 1.4
+  namespace: sebastian13
+  role_name: msmtp
+  author: "Sebastian Plocek"
+  description: "Configure msmtp for Debian-based systems"
+  license: "MIT"
+  min_ansible_version: "2.10.0"
   platforms:
-  - name: Ubuntu
-    versions:
-    - precise
-  categories:
-  - system
-  - networking
+    - name: Debian
+      versions:
+        - bookworm
+        - trixie
+  galaxy_tags:
+    - system
+    - networking
+    - mail
+
+dependencies: []

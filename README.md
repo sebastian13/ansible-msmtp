@@ -1,19 +1,33 @@
-[![Build Status](https://travis-ci.org/ahelal/ansible-msmtp.svg?branch=master)](https://travis-ci.org/ahelal/ansible-msmtp)
-#Readme
+# Ansible msmtp
 
-This ansible role deploys msmtp for Ubuntu 12.04 (tested on vagrant)
+Forked from the original work by Adham Helal and maintained by Sebastian Plocek.
 
-##Prerequisite
-* Having ansible installed on your workstation. 
-* Having an SMTP server 
+This Ansible role configures `msmtp` for Debian-based systems and is intended for modern Debian releases.
 
-##How to install
-* Use github to clone/fork in your role directory
-* ansible galaxy ```ansible-galaxy install adham.helal.msmtp```
+## Prerequisites
 
-##Variables 
-  All the default variables are located **defaults/main.yml**. Mostly you would need to configure the following variables. 
-  - *msmtp_accounts:* You can define one or more smtp account 
+* Ansible installed on your workstation
+* A reachable SMTP server
+
+## How to install
+
+Install directly from Ansible Galaxy:
+
+```bash
+ansible-galaxy role install sebastian13.msmtp -p roles
+```
+
+Or clone it into your roles directory:
+
+```bash
+git clone https://github.com/sebastian13/ansible-msmtp.git roles/msmtp
+```
+
+## Variables
+
+All default variables are defined in **defaults/main.yml**. Most setups need at least the following values:
+
+- `msmtp_accounts`: one or more SMTP accounts
  
       ```
       msmtp_accounts:
@@ -30,63 +44,82 @@ This ansible role deploys msmtp for Ubuntu 12.04 (tested on vagrant)
         user     : "myuser"
         password : "123456"
       ```
-  - *msmtp_default_account:* Default smtp account to use 
+- `msmtp_default_account`: default SMTP account to use
 
-    ```msmtp_default_account: "gmail"```
+  ```yaml
+  msmtp_default_account: "gmail"
+  ```
 
-  - *msmtp_from:* From field
+- `msmtp_from`: sender address / From field
 
-    ```msmtp_from : "No Reply"```
-  
-  - Logging 
-     - Option A (syslog)
-     
-       ```
-        msmtp_log : "syslog"
-       ```
+  ```yaml
+  msmtp_from: "No Reply"
+  ```
 
-     - Option B (file logging)
-     
-       ```
-        msmtp_log     : "file"
-        msmtp_logfile : /var/log/msmtp.log
-       ```
+### Logging
 
-     - Option C (No logging)
+- Option A: syslog
 
-       ```
-        msmtp_log     : "no"
-       ```
+  ```yaml
+  msmtp_log: "syslog"
+  ```
 
-  - Mail aliases 
-     - *msmtp_alias_default:* default email this required 
+- Option B: file logging
 
-       ```msmtp_alias_default : ops@example.com```
+  ```yaml
+  msmtp_log: "file"
+  msmtp_logfile: /var/log/msmtp.log
+  ```
 
-     - *msmtp_alias_root:* root email this is optional
+- Option C: no logging
 
-       ```msmtp_alias_root : root@example.com```
+  ```yaml
+  msmtp_log: "no"
+  ```
 
-     - *msmtp_alias_cron:* cron email this optional
+### Mail aliases
 
-       ```msmtp_alias_cron : cron@example.com``` 
+- `msmtp_alias_default`: default address
 
-##Configure
-You can configure your variables in ansible with one of the following
+  ```yaml
+  msmtp_alias_default: ops@example.com
+  ```
 
- * Create a variable in host/group variables directory. (recommended)
- * Editing var/main.yml
- * Run ansible-playbook with -e
- * Edit the default/main.yml (not recommended)
+- `msmtp_alias_root`: root alias
 
-##Run
-**By default the mstmp will fail because the configuration uses a bogus smtp server you need to use a valid smtp server**
-    
-  ```ansible-playbook -l hostname msmtp.yml```
+  ```yaml
+  msmtp_alias_root: root@example.com
+  ```
 
-##Test
-  You should get a test mail if it works on the root mail
+- `msmtp_alias_cron`: cron alias
 
-##Possible issues
- From field requires more work 
-[http://msmtp.sourceforge.net/doc/msmtp.html#Envelope_002dfrom-address](http://msmtp.sourceforge.net/doc/msmtp.html#Envelope_002dfrom-address) 
+  ```yaml
+  msmtp_alias_cron: cron@example.com
+  ```
+
+## Configure
+
+You can configure the role with any of the following methods:
+
+* host/group vars (recommended)
+* editing `vars/main.yml`
+* passing vars via `ansible-playbook -e`
+* editing `defaults/main.yml` (not recommended)
+
+## Run
+
+> By default, the role should not be used with a bogus SMTP server. Configure a valid SMTP endpoint before applying it.
+
+```bash
+ansible-playbook -l hostname msmtp.yml
+```
+
+## Test
+
+You should receive a test mail in the configured root or alias address when the role is working correctly.
+
+## Possible issues
+
+The From field may require additional tuning depending on your mail provider and envelope settings:
+
+[msmtp documentation](http://msmtp.sourceforge.net/doc/msmtp.html#Envelope_002dfrom-address)
