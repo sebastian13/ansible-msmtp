@@ -1,10 +1,11 @@
+---
 galaxy_info:
   namespace: sebastian13
   role_name: msmtp
-  author: "Sebastian Plocek"
-  description: "Configure msmtp for Debian-based systems"
-  license: "MIT"
-  min_ansible_version: "2.10.0"
+  author: "Adham Helal, Christian Wagner, Sebastian Plocek"
+  description: "Configure msmtp as system MTA on Debian"
+  license: "Apache-2.0"
+  min_ansible_version: "2.15"
   platforms:
     - name: Debian
       versions:

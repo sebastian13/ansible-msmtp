@@ -1,3 +1,98 @@
 ---
-- name: Import msmtp tasks
-  ansible.builtin.import_tasks: msmtp.yml
+# msmtp-mta replaces postfix (both provide mail-transport-agent). Hosts with postfix use it
+# on purpose (Proxmox VE/Backup Server notifications, Proxmox Mail Gateway, mail servers,
+# relays), so never touch them. To switch such a host to msmtp, remove postfix manually first.
+- name: Gather installed packages
+  ansible.builtin.package_facts:
+    manager: apt
+  tags: mail
+
+- name: Refuse to replace postfix
+  ansible.builtin.assert:
+    that: "'postfix' not in ansible_facts.packages"
+    fail_msg: >-
+      postfix is installed: msmtp-mta would replace it. Exclude this host from the play
+      (e.g. hosts: all:!proxmox_hypervisors:!proxmox_backup_servers) or remove postfix manually.
+    quiet: true
+  tags: mail
+
+- name: Install msmtp and mailx
+  ansible.builtin.apt:
+    name:
+      - msmtp
+      - msmtp-mta
+      - bsd-mailx
+    state: present
+    update_cache: true
+    cache_valid_time: 14400
+  notify: Send msmtp test mail
+  tags: mail
+
+# Older msmtp versions abort on unknown options, so version-dependent options
+# (set_from_header >= 1.8.8) are only written if the installed version supports them.
+- name: Get installed msmtp version
+  ansible.builtin.command: msmtp --version
+  register: _msmtp_version_cmd
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  tags: mail
+
+- name: Set msmtp version fact
+  ansible.builtin.set_fact:
+    # "0" if msmtp is not installed yet (check mode on a new host)
+    _msmtp_version: "{{ _msmtp_version_cmd.stdout_lines[0] | default('') | regex_search('[0-9]+(\\.[0-9]+)+') | default('0', true) }}"
+  tags: mail
+
+- name: Ensure group for msmtp configuration
+  ansible.builtin.group:
+    name: "{{ msmtprc_group }}"
+    system: true
+    state: present
+  tags: mail
+
+- name: Get dpkg-statoverride for msmtp binary
+  ansible.builtin.command: dpkg-statoverride --list /usr/bin/msmtp
+  register: _msmtp_statoverride
+  changed_when: false
+  failed_when: _msmtp_statoverride.rc not in [0, 1]
+  check_mode: false
+  when: msmtp_binary_setgid | bool
+  tags: mail
+
+- name: Remove differing dpkg-statoverride for msmtp binary
+  ansible.builtin.command: dpkg-statoverride --remove /usr/bin/msmtp
+  changed_when: true
+  when:
+    - msmtp_binary_setgid | bool
+    - _msmtp_statoverride.rc == 0
+    - _msmtp_statoverride.stdout | trim != _msmtp_statoverride_wanted
+  tags: mail
+
+- name: Make msmtp binary setgid via dpkg-statoverride
+  ansible.builtin.command: "dpkg-statoverride --update --add root {{ msmtprc_group }} 2755 /usr/bin/msmtp"
+  changed_when: true
+  when:
+    - msmtp_binary_setgid | bool
+    - _msmtp_statoverride.stdout | trim != _msmtp_statoverride_wanted
+  tags: mail
+
+- name: Copy msmtprc
+  ansible.builtin.template:
+    src: msmtprc.j2
+    dest: /etc/msmtprc
+    owner: "{{ msmtprc_owner }}"
+    group: "{{ msmtprc_group }}"
+    mode: "{{ msmtprc_mode }}"
+  notify: Send msmtp test mail
+  tags: mail
+
+- name: Copy aliases
+  ansible.builtin.template:
+    src: aliases.j2
+    dest: /etc/aliases
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Send msmtp test mail
+  tags: mail

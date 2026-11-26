@@ -1,28 +1,60 @@
 ---
+# Variable names are compatible with chriswayg.msmtp-mailer, so the role is a drop-in replacement.
+
 msmtp_accounts:
-  # Account 1
-  - account: "gmail"
-    host: "smtp.gmail.com"
-    port: 587
-    auth: "on"
-    user: "example@gmail.example"
-    password: "some password"
-  # Account 2
   - account: "mysmtp"
-    host: "smtp.example"
+    host: "smtp.example.com"
     port: 587
     auth: "on"
-    user: "myuser"
-    password: "123456"
+    from: "admin@example.com"
+    user: "admin@example.com"
+    password: "change-me"
+    # Optional per account:
+    # tls: "on"
+    # tls_starttls: "on"
 
-msmtp_default_account: "gmail"
-msmtp_from: "My Org"
+msmtp_default_account: "mysmtp"
 
-# Logging (Select A) "syslog" or B) "file" logging or C) "no" log
+# Argument for msmtp's "domain" command (EHLO/HELO).
+# Use the domain part of the sender address or the FQDN of the host.
+msmtp_domain: "{{ ansible_facts['fqdn'] }}"
+
+# TLS defaults for all accounts
+msmtp_tls_starttls: "on"
+msmtp_tls_trust_file: /etc/ssl/certs/ca-certificates.crt
+
+# Replace the From header with the account's "from" address.
+# "on": always (e.g. cron sends "From: root (Cron Daemon)" without a domain, which breaks DMARC alignment)
+# "auto": only if the mail has no From header (msmtp default)
+# "off": never touch the From header
+# "": do not write the option at all
+# Only written if the installed msmtp supports it (>= 1.8.8), older versions abort on unknown options.
+msmtp_set_from_header: "on"
+
+# Logging: "syslog", "file" or "no"
 msmtp_log: "syslog"
-# msmtp_logfile: /var/log/msmtp.log
+# Used with "syslog": LOG_USER, LOG_MAIL, LOG_LOCAL0 … LOG_LOCAL7
+msmtp_syslog_facility: "LOG_MAIL"
+# Used with "file"
+msmtp_logfile: /var/log/msmtp.log
 
-# Aliases mail account (only msmtp_alias_default is required, the rest is optional)
-msmtp_alias_default: ops@example.
-msmtp_alias_root: root@example.com
-msmtp_alias_cron: cron@example.com
+# Aliases (/etc/aliases). Only msmtp_alias_default is required.
+msmtp_alias_default: "ops@example.com"
+# msmtp_alias_root: "root@example.com"
+# msmtp_alias_cron: "cron@example.com"
+
+# Send a test mail whenever the configuration changes.
+# Enable only after the default account works.
+msmtp_send_test_mail: false
+msmtp_test_mail_recipient: "ops@example.com"
+
+# /etc/msmtprc contains SMTP passwords. With the default group "msmtp", mode "0640"
+# and msmtp_binary_setgid, only root and the msmtp binary can read it, while every
+# user (e.g. cron jobs of other users) can still send mail.
+msmtprc_owner: root
+msmtprc_group: msmtp
+msmtprc_mode: "0640"
+
+# Make /usr/bin/msmtp setgid msmtprc_group via dpkg-statoverride (survives package updates).
+# Required for non-root users to send mail when /etc/msmtprc is not world-readable.
+msmtp_binary_setgid: true

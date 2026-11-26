@@ -1,10 +1,18 @@
 ---
-# send test mail to admin
-- name: Test mail
+# Sends via msmtp directly with explicit From/To headers. mail(1) to "root" would put
+# "To: root" into the header, which providers like Lettermint reject (553 Invalid To).
+- name: Send msmtp test mail
+  # "test mail" is the handler name of chriswayg.msmtp-mailer, playbooks may still notify it
+  listen: test mail
   ansible.builtin.shell: |
     set -o pipefail
-    echo "Test mail from new/updated MSTMP at $(hostname)" | mail root -s "Test SMTP $(hostname)"
+    printf 'From: %s\nTo: %s\nSubject: Test msmtp at %s\n\nTest mail from new/updated msmtp\n\n%s\n' \
+      "{{ msmtp_accounts | selectattr('account', 'equalto', msmtp_default_account) | map(attribute='from') | first }}" \
+      "{{ msmtp_test_mail_recipient }}" \
+      "$(hostname -f)" "$(uname -a)" \
+      | msmtp -- "{{ msmtp_test_mail_recipient }}"
   args:
     executable: /bin/bash
-  changed_when: false
+  changed_when: true
+  when: msmtp_send_test_mail | bool
   tags: mail

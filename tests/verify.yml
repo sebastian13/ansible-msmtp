@@ -1,0 +1,120 @@
+---
+# Verifies a host configured by this role and sends two test mails:
+#   1. as user "nobody" without From header (setgid binary + set_from_header)
+#   2. a real cron mail with "From: root (Cron Daemon)" (set_from_header replaces it)
+# Check the received headers: From with domain, Authentication-Results dmarc=pass.
+#
+#   ansible-playbook path/to/sebastian13.msmtp/tests/verify.yml -l <host>
+#
+# Do not run with --check. Recipient: msmtp_verify_recipient (default msmtp_test_mail_recipient).
+- name: Verify msmtp setup
+  hosts: all
+  become: true
+  gather_facts: false
+  vars:
+    msmtp_verify_recipient: "{{ msmtp_test_mail_recipient }}"
+    msmtp_verify_cron_wait: 130
+
+  tasks:
+    - name: Get start time for journal
+      ansible.builtin.command: date '+%Y-%m-%d %H:%M:%S'
+      register: _verify_start
+      changed_when: false
+
+    - name: Get msmtp version
+      ansible.builtin.command: msmtp --version
+      register: _verify_version
+      changed_when: false
+
+    - name: Stat msmtprc and binary
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop:
+        - /etc/msmtprc
+        - /usr/bin/msmtp
+      register: _verify_stat
+
+    - name: Get set_from_header from msmtprc
+      ansible.builtin.command: grep -E '^set_from_header' /etc/msmtprc
+      register: _verify_sfh
+      changed_when: false
+      failed_when: false
+
+    - name: Try to read msmtprc as nobody
+      ansible.builtin.command: runuser -u nobody -- cat /etc/msmtprc
+      register: _verify_nobody_read
+      changed_when: false
+      failed_when: false
+      no_log: true
+
+    - name: Assert permissions and configuration
+      vars:
+        _rc: "{{ _verify_stat.results[0].stat }}"
+        _bin: "{{ _verify_stat.results[1].stat }}"
+        _ver: "{{ _verify_version.stdout_lines[0] | regex_search('[0-9]+(\\.[0-9]+)+') }}"
+      ansible.builtin.assert:
+        that:
+          - _rc.pw_name == 'root'
+          - _rc.gr_name == 'msmtp'
+          - _rc.mode == '0640'
+          - _bin.gr_name == 'msmtp'
+          - _bin.isgid
+          - _verify_nobody_read.rc != 0
+          - (_ver is version('1.8.8', '<')) or ('set_from_header on' in _verify_sfh.stdout)
+        success_msg: >-
+          msmtp {{ _ver }}: /etc/msmtprc {{ _rc.pw_name }}:{{ _rc.gr_name }} {{ _rc.mode }},
+          /usr/bin/msmtp {{ _bin.pw_name }}:{{ _bin.gr_name }} {{ _bin.mode }},
+          nobody cannot read msmtprc, '{{ _verify_sfh.stdout }}'
+        fail_msg: >-
+          msmtp {{ _ver }}: /etc/msmtprc {{ _rc.pw_name }}:{{ _rc.gr_name }} {{ _rc.mode }},
+          /usr/bin/msmtp {{ _bin.pw_name }}:{{ _bin.gr_name }} {{ _bin.mode }} (setgid {{ _bin.isgid }}),
+          nobody read rc={{ _verify_nobody_read.rc }}, '{{ _verify_sfh.stdout }}'
+
+    - name: Send mail as nobody without From header
+      ansible.builtin.shell: |
+        set -o pipefail
+        printf 'To: %s\nSubject: msmtp verify nobody %s\n\nmsmtp verify: sent as nobody without From header\n' \
+          "{{ msmtp_verify_recipient }}" "$(hostname -f)" \
+          | runuser -u nobody -- msmtp -- "{{ msmtp_verify_recipient }}"
+      args:
+        executable: /bin/bash
+      changed_when: true
+
+    - name: Send cron mail
+      block:
+        - name: Create temporary cron job
+          ansible.builtin.copy:
+            dest: /etc/cron.d/msmtp-verify
+            content: |
+              MAILTO={{ msmtp_verify_recipient }}
+              * * * * * root echo "msmtp verify: cron mail from $(hostname -f)"
+            owner: root
+            group: root
+            mode: "0644"
+
+        - name: Wait for cron to run the job
+          ansible.builtin.wait_for:
+            timeout: "{{ msmtp_verify_cron_wait }}"
+
+      always:
+        - name: Remove temporary cron job
+          ansible.builtin.file:
+            path: /etc/cron.d/msmtp-verify
+            state: absent
+
+    - name: Get msmtp journal since start
+      ansible.builtin.command: journalctl -t msmtp --since "{{ _verify_start.stdout }}" --no-pager -o short-iso
+      register: _verify_journal
+      changed_when: false
+
+    - name: Show msmtp journal
+      ansible.builtin.debug:
+        var: _verify_journal.stdout_lines
+
+    - name: Assert all mails were accepted
+      ansible.builtin.assert:
+        that:
+          - _verify_journal.stdout_lines | select('search', 'smtpstatus=250') | list | length >= 2
+          - _verify_journal.stdout_lines | select('search', 'exitcode=EX_') | reject('search', 'EX_OK') | list | length == 0
+        success_msg: "Mails accepted by the server. Now check From and Authentication-Results in the mailbox."
+        fail_msg: "Not all mails were accepted, see journal above."
