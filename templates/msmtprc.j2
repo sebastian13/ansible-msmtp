@@ -30,6 +30,9 @@ host     {{ msmtp_account.host }}
 port     {{ msmtp_account.port }}
 auth     {{ msmtp_account.auth }}
 from     {{ msmtp_account.from }}
+{% if msmtp_account.from_full_name is defined and _msmtp_version is version('1.8.24', '>=') %}
+from_full_name "{{ msmtp_account.from_full_name }}"
+{% endif %}
 {% if msmtp_account.user is defined %}
 user     {{ msmtp_account.user }}
 {% endif %}

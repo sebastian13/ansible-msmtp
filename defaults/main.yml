@@ -12,6 +12,9 @@ msmtp_accounts:
     # Optional per account:
     # tls: "on"
     # tls_starttls: "on"
+    # Display name in the From header, e.g. "{{ inventory_hostname }}" (msmtp >= 1.8.24,
+    # ignored on older versions). With set_from_header on it replaces any name in the mail.
+    # from_full_name: "{{ inventory_hostname }}"
 
 msmtp_default_account: "mysmtp"
 

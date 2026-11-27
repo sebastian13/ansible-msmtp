@@ -14,6 +14,8 @@ Additions compared to `chriswayg.msmtp-mailer`:
   SMTP passwords are not readable by other users, but every user can still send mail.
 - Test mail is sent with explicit `From`/`To` headers (providers like Lettermint reject `To: root`).
 - Per-account `tls` option.
+- Per-account `from_full_name` (msmtp >= 1.8.24) for a display name in the From header,
+  e.g. `EXAMPLE.web01 <EXAMPLE.web01@example.com>` instead of the bare address.
 - Fails on hosts with postfix instead of replacing it (Proxmox VE, Backup Server, Mail Gateway,
   mail servers, relays). To switch such a host to msmtp, remove postfix manually first.
 - Debian only (bookworm, trixie).
@@ -58,7 +60,7 @@ See [defaults/main.yml](defaults/main.yml) for all variables and their defaults.
 
 | Variable | Default | Description |
 |---|---|---|
-| `msmtp_accounts` | example | List of accounts: `account`, `host`, `port`, `auth`, `from`, optional `user`, `password`, `tls`, `tls_starttls` |
+| `msmtp_accounts` | example | List of accounts: `account`, `host`, `port`, `auth`, `from`, optional `user`, `password`, `tls`, `tls_starttls`, `from_full_name` |
 | `msmtp_default_account` | `mysmtp` | Account used by default |
 | `msmtp_domain` | host FQDN | EHLO/HELO domain |
 | `msmtp_tls_starttls` | `on` | Default for all accounts |
